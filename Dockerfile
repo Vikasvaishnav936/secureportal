@@ -1,29 +1,41 @@
-FROM php:8.2-cli
+FROM php:8.2-apache
 
-# Install system dependencies
+# Install required packages INCLUDING sqlite dev
 RUN apt-get update && apt-get install -y \
-    git unzip libzip-dev zip curl sqlite3 libsqlite3-dev \
-    && docker-php-ext-install pdo pdo_sqlite
+    git \
+    unzip \
+    zip \
+    curl \
+    sqlite3 \
+    libsqlite3-dev \
+    libzip-dev \
+    pkg-config \
+    && docker-php-ext-install pdo pdo_sqlite zip
+
+# Enable Apache rewrite
+RUN a2enmod rewrite
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Set working directory
-WORKDIR /var/www
+WORKDIR /var/www/html
 
-# Copy project files
+# Copy project
 COPY . .
 
-# Install PHP dependencies
+# Install Laravel dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Create SQLite database
+# Create SQLite file
 RUN mkdir -p database
 RUN touch database/database.sqlite
 
-# Set permissions
-RUN chmod -R 777 storage bootstrap/cache database
+# Permissions
+RUN chmod -R 775 storage bootstrap/cache database
 
-EXPOSE 10000
+# Set Apache public folder
+RUN sed -i 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf
 
-CMD php artisan serve --host=0.0.0.0 --port=10000
+EXPOSE 80
+
+CMD ["apache2-foreground"]
